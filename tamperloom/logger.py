@@ -3,17 +3,16 @@ from pathlib import Path
 
 from tamperloom.schema import build_entry
 
-# first entry in a new log has nothing before it
 GENESIS_HASH = "0" * 64
 
 
 class AuditLogger:
     def __init__(self, filepath: str):
         self.filepath = Path(filepath)
+        self.checkpoint = Path(filepath + ".checkpoint")
         self._prev_hash = self._get_last_hash()
 
     def _get_last_hash(self) -> str:
-        # if the file doesn't exist yet, this is a fresh log
         if not self.filepath.exists():
             return GENESIS_HASH
 
@@ -27,8 +26,13 @@ class AuditLogger:
         if last_line is None:
             return GENESIS_HASH
 
-        # grab the hash from whatever the last entry was
         return json.loads(last_line)["entry_hash"]
+
+    def _update_checkpoint(self, latest_hash: str):
+        # keep a separate record of the latest hash
+        # if the log gets wiped, this still exists
+        with open(self.checkpoint, "w") as f:
+            f.write(latest_hash)
 
     def log(self, event_type: str, actor: str, action: str, target: str, metadata=None):
         entry = build_entry(
@@ -43,5 +47,5 @@ class AuditLogger:
         with open(self.filepath, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
-        # update so the next entry chains off this one
         self._prev_hash = entry["entry_hash"]
+        self._update_checkpoint(self._prev_hash)

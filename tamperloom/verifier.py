@@ -8,8 +8,13 @@ GENESIS_HASH = "0" * 64
 
 def verify_chain(filepath: str) -> bool:
     path = Path(filepath)
+    checkpoint = Path(filepath + ".checkpoint")
 
     if not path.exists():
+        # log is gone but checkpoint still exists — someone wiped the log
+        if checkpoint.exists():
+            print("log file missing but checkpoint exists — log may have been deleted")
+            return False
         print(f"file not found: {filepath}")
         return False
 
@@ -27,9 +32,7 @@ def verify_chain(filepath: str) -> bool:
     expected_prev = GENESIS_HASH
 
     for i, entry in enumerate(entries):
-        # pull the stored hash out before we recompute
         stored_hash = entry.pop("entry_hash")
-
         recomputed = _sha256(json.dumps(entry, sort_keys=True))
 
         if recomputed != stored_hash:
@@ -41,6 +44,13 @@ def verify_chain(filepath: str) -> bool:
             return False
 
         expected_prev = stored_hash
+
+    # check final hash matches checkpoint
+    if checkpoint.exists():
+        saved = checkpoint.read_text().strip()
+        if saved != expected_prev:
+            print("checkpoint mismatch — log may have been truncated or replaced")
+            return False
 
     print(f"chain valid: {len(entries)} entries verified")
     return True

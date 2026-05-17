@@ -52,3 +52,13 @@ def test_chain_links_correctly(tmp_path):
     entries = [json.loads(line) for line in log.read_text().splitlines()]
     # second entry's prev_hash should match first entry's entry_hash
     assert entries[1]["prev_hash"] == entries[0]["entry_hash"]
+
+def test_deleted_log_detected(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    logger = AuditLogger(str(log))
+    logger.log(event_type="user.login", actor="admin", action="login", target="app")
+
+    # delete the log but leave the checkpoint
+    log.unlink()
+
+    assert verify_chain(str(log)) is False
