@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import portalocker
+
 from tamperloom.schema import build_entry
 
 GENESIS_HASH = "0" * 64
@@ -44,8 +46,11 @@ class AuditLogger:
             metadata=metadata,
         )
 
+        # lock the file while writing so concurrent processes don't corrupt the chain
         with open(self.filepath, "a") as f:
+            portalocker.lock(f, portalocker.LOCK_EX)
             f.write(json.dumps(entry) + "\n")
+            portalocker.unlock(f)
 
         self._prev_hash = entry["entry_hash"]
         self._update_checkpoint(self._prev_hash)
